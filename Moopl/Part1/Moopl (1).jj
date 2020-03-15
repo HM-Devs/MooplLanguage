@@ -1,0 +1,354 @@
+options {
+  STATIC = false;
+}
+
+PARSER_BEGIN(MooplParser)
+  import syntaxtree.*;
+  import syntaxtree.interp.*;
+  import java.util.List;
+  import java.util.LinkedList;
+  public class MooplParser {
+  }
+PARSER_END(MooplParser)
+
+SKIP : /* Define white-space and comments here */
+{
+    " "
+  | "\t"
+  | "\n"
+  | "\r"
+  | "\f"
+  | < "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n") >
+  | <"/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/">
+}
+
+TOKEN : /* Define the Moopl tokens here. */
+{
+  < PROC: "proc" >
+| < FUN: "fun" >
+| < CLASS: "class" >
+| < EXTENDS: "extends" >
+| < OPENCBR: "{" >
+| < CLOSECBR: "}" >
+| < SEMICOLON: ";" >
+| < OPENBRAC: "(" >
+| < CLOSEBRAC: ")" >
+| < RETURN: "return" >
+| < COMMA: "," >
+| < ARRAYOF: "arrayof" >
+| < BOOL: "boolean" >
+| < INT: "int" >
+| < EQUALS: "=" >
+| < OPENSQBR: "[" >
+| < CLOSESQBR: "]" >
+| < IF: "if" >
+| < THEN: "then" >
+| < ELSE: "else" >
+| < WHILE: "while" >
+| < DO: "do" >
+| < OUTPUT: "output" >
+| < DOT: "." >
+| < LENGTH: "length" >
+| < TRUE: "true" >
+| < FALSE: "false" >
+| < SELF: "self" >
+| < NEW: "new" >
+| < OBJ: "object" >
+| < NOT: "!" >
+| < ISNULL: "isnull" >
+| < OP: "and" | "<" | "==" | "div" | "+" | "-" | "*" >
+| < INTEGER_LITERAL: (["0"-"9"])+ >
+| < ID: ["a"-"z","A"-"Z"](["a"-"z","A"-"Z","0"-"9","_"])* >
+}
+
+/*
+ * TOKEN tester
+ */
+public void testTokens() :
+{
+  Token t;
+}
+{
+  ( ( ( t = <PROC>
+      | t = <FUN>
+      | t = <CLASS>
+      | t = <EXTENDS>
+      | t = <OPENCBR>
+      | t = <CLOSECBR>
+      | t = <SEMICOLON>
+      | t = <OPENBRAC>
+      | t = <CLOSEBRAC>
+      | t = <RETURN>
+      | t = <COMMA>
+      | t = <ARRAYOF>
+      | t = <BOOL>
+      | t = <INT>
+      | t = <EQUALS>
+      | t = <OPENSQBR>
+      | t = <CLOSESQBR>
+      | t = <IF>
+      | t = <THEN>
+      | t = <ELSE>
+      | t = <WHILE>
+      | t = <DO>
+      | t = <OUTPUT>
+      | t = <DOT>
+      | t = <LENGTH>
+      | t = <TRUE>
+      | t = <FALSE>
+      | t = <SELF>
+      | t = <NEW>
+      | t = <OBJ>
+      | t = <NOT>
+      | t = <ISNULL>
+      )
+      { System.out.println("Recognised as valid token: " + t.image); }
+    )
+  | ( t = <INTEGER_LITERAL>
+      { System.out.println("Recognised as INTEGER_LITERAL: " + t.image); }
+    )
+  | ( t = <ID>
+      { System.out.println("Recognised as ID: " + t.image); }
+    )
+  | ( t = <OP> 
+      { System.out.println("Recognised as OP: " + t.image); }
+    )
+  )*
+}
+
+
+/************************************
+ * The Moopl grammar starts here *
+ ************************************/
+
+public Program nt_Program() :
+{
+  ProcDecl pd;
+  ClassDecl cd;
+  List<ProcDecl> pds = new LinkedList<ProcDecl>();
+  List<ClassDecl> cds = new LinkedList<ClassDecl>();
+}
+{
+  (pd = nt_ProcDecl() { pds.add(pd); })+
+  (cd = nt_ClassDecl() { cds.add(cd); })*
+  { return new Program(pds, cds); }
+}
+
+public ClassDecl nt_ClassDecl() :
+{
+  Token tok1;
+  Token tok2;
+  FieldDecl fd;
+  MethodDecl md;
+  List<FieldDecl> fds = new LinkedList<FieldDecl>();
+  List<MethodDecl> mds = new LinkedList<MethodDecl>();
+}
+{ 
+  LOOKAHEAD(3) 
+  <CLASS> tok1 = <ID> <OPENCBR> 
+  (fd = nt_FieldDecl() { fds.add(fd); })* (md = nt_MethodDecl() { mds.add(md); })* <CLOSECBR>
+  { return new ClassDeclSimple(tok1.image, fds, mds); }
+  
+  | <CLASS> tok1 = <ID> <EXTENDS> tok2 = <ID> <OPENCBR> 
+    (fd = nt_FieldDecl() { fds.add(fd); })* (md = nt_MethodDecl() { mds.add(md); })* <CLOSECBR>
+    { return new ClassDeclExtends(tok1.image, tok2.image, fds, mds); }
+}
+
+public MethodDecl nt_MethodDecl() :
+{
+  ProcDecl procDecl;
+  FunDecl funDecl;
+}
+{
+  procDecl = nt_ProcDecl() { return procDecl; }
+  | funDecl = nt_FunDecl() { return funDecl; }
+}
+
+public FunDecl nt_FunDecl() :
+{
+  Type t;
+  Exp e;
+  Token tok;
+  Formal f;
+  Stm s;
+  List<Formal> fs = new LinkedList<Formal>();
+  List<Stm> ss = new LinkedList<Stm>();
+}
+{
+  <FUN> t = nt_Type() tok = <ID> 
+  <OPENBRAC> fs = nt_FormalList() <CLOSEBRAC> 
+  <OPENCBR> (s = nt_Statement() { ss.add(s); })* <RETURN> 
+  e = nt_Exp() <SEMICOLON> <CLOSECBR>
+  { return new FunDecl(t, tok.image, fs, ss, e); }
+}
+
+public ProcDecl nt_ProcDecl() :
+{
+  Token tok;
+  Formal f;
+  Stm s;
+  List<Formal> fs = new LinkedList<Formal>();
+  List<Stm> ss = new LinkedList<Stm>();
+}
+{
+  <PROC> tok = <ID> 
+  <OPENBRAC> fs = nt_FormalList() <CLOSEBRAC> 
+  <OPENCBR> (s = nt_Statement() { ss.add(s); })* <CLOSECBR>
+  { return new ProcDecl(tok.image, fs, ss); }
+}
+
+public Exp nt_PrimaryExp() :
+{
+  Token tok;
+  Var v;
+  Exp ex;
+  Type t;
+  List<Exp> exs = new LinkedList<Exp>();
+}
+{
+  tok = <INTEGER_LITERAL> { return new ExpInteger(Integer.parseInt(tok.image)); }
+  | <TRUE> { return new ExpTrue(); }
+  | <FALSE> { return new ExpFalse(); }
+  | v = nt_Var() { return new ExpVar(v); }
+  | <SELF> { return new ExpSelf(); }
+  
+  | LOOKAHEAD(2) <NEW> <ARRAYOF> <OPENBRAC> t = nt_Type() <CLOSEBRAC> <OPENSQBR> 
+    ex = nt_Exp() <CLOSESQBR> { return new ExpNewArray(t, ex); }
+  
+  | <NEW> <OBJ> tok = <ID> <OPENBRAC> exs = nt_ExpList() <CLOSEBRAC> { return new ExpNewObject(tok.image, exs); }
+  | <NOT> ex = nt_PrimaryExp() { return new ExpNot(ex); }
+  | <ISNULL> ex = nt_PrimaryExp() { return new ExpIsnull(ex); }
+  | <OPENBRAC> ex = nt_Exp() <CLOSEBRAC> { return ex; }
+}
+
+public FieldDecl nt_FieldDecl() :
+{
+  Type t;
+  Token tok;
+}
+{
+  t = nt_Type() tok = <ID> <SEMICOLON> { return new FieldDecl(t, tok.image); }
+}
+
+public Type nt_Type() :
+{
+  Type t;
+  Token tok;
+}
+{
+  <ARRAYOF> <OPENBRAC> t = nt_Type() <CLOSEBRAC> { return new TypeArray(t); }
+  | <BOOL> { return new TypeBoolean(); }
+  | <INT> { return new TypeInt(); }
+  | tok = <ID> { return new TypeClassType(tok.image); }
+}
+
+public List<Formal> nt_FormalList() :
+{
+  Type t;
+  Token tok;
+  Formal f;
+  List<Formal> fs = new LinkedList<Formal>();
+}
+{
+  (t = nt_Type() tok = <ID> {f = new Formal(t, tok.image); fs.add(f);}
+  (f = nt_FormalRest() { fs.add(f); })*)? { return fs; }
+}
+
+public Formal nt_FormalRest() :
+{
+  Type t;
+  Token tok;
+}
+{
+  <COMMA> t = nt_Type() tok = <ID> { return new Formal(t, tok.image); }
+}
+
+public Stm nt_Statement() :
+{
+  Token tok;
+  Type t;
+  Var v;
+  Exp ex;
+  Exp ex2;
+  Exp ex3;
+  List<Exp> exs = new LinkedList<Exp>();
+  StmBlock sb1;
+  StmBlock sb2;
+}
+{
+  sb1 = nt_Block() { return sb1; }
+  | LOOKAHEAD(2) t = nt_Type() tok = <ID> <SEMICOLON> { return new StmVarDecl(t, tok.image); }
+  | LOOKAHEAD(2) v = nt_Var() <EQUALS> ex = nt_Exp() <SEMICOLON> { return new StmAssign(v, ex); }
+  | ex = nt_PrimaryExp() (<OPENSQBR> ex2 = nt_Exp() <CLOSESQBR> <EQUALS> ex3 = nt_Exp() <SEMICOLON> 
+                          { return new StmArrayAssign(ex, ex2, ex3); }
+                         |<DOT> tok = <ID> <OPENBRAC> exs = nt_ExpList() <CLOSEBRAC> <SEMICOLON> 
+                          { return new StmCall(ex, tok.image, exs); })
+  | <IF> <OPENBRAC> ex = nt_Exp() <CLOSEBRAC> <THEN> sb1 = nt_Block() <ELSE> sb2 = nt_Block() { return new StmIf(ex, sb1, sb2); }
+  | <WHILE> <OPENBRAC> ex = nt_Exp() <CLOSEBRAC> <DO> sb1 = nt_Block() { return new StmWhile(ex, sb1); }
+  | <OUTPUT> ex = nt_Exp() <SEMICOLON> { return new StmOutput(ex); }
+}
+
+public StmBlock nt_Block() :
+{
+  Stm s;
+  List<Stm> ss = new LinkedList<Stm>();
+}
+{
+  <OPENCBR> (s = nt_Statement() {ss.add(s); })* <CLOSECBR> { return new StmBlock(ss); }
+}
+
+public Exp nt_Exp() :
+{
+  Token tok;
+  Exp ex1;
+  Exp ex2;
+  List<Exp> exs = new LinkedList<Exp>();
+  ExpOp.Op op;
+}
+{
+  ex1 = nt_PrimaryExp()(tok = <OP> ex2 = nt_PrimaryExp() { if ("and".equals(tok.image)){ op = ExpOp.Op.AND; } 
+                                                           else if ("<".equals(tok.image)){ op = ExpOp.Op.LESSTHAN; } 
+                                                           else if ("==".equals(tok.image)){ op = ExpOp.Op.EQUALS; }
+                                                           else if ("div".equals(tok.image)){ op = ExpOp.Op.DIV; }
+                                                           else if ("+".equals(tok.image)){ op = ExpOp.Op.PLUS; }
+                                                           else if ("-".equals(tok.image)){ op = ExpOp.Op.MINUS; }
+                                                           else if ("*".equals(tok.image)){ op = ExpOp.Op.TIMES; }
+                                                           else { throw new Error("Operator not initialised"); }
+                                                           return new ExpOp(ex1, op, ex2); }
+                       |<OPENSQBR> ex2 = nt_Exp() <CLOSESQBR> { return new ExpArrayLookup(ex1, ex2); }
+                       |LOOKAHEAD(2) <DOT> <LENGTH> { return new ExpArrayLength(ex1); }
+                       |<DOT> tok = <ID> <OPENBRAC> exs = nt_ExpList() <CLOSEBRAC> { return new ExpCall(ex1, tok.image, exs); }
+                       |{} { return ex1; })
+}
+
+public Var nt_Var() :
+{
+  Token tok;
+}
+{
+  tok = <ID> { return new Var(tok.image); }
+}
+
+public List<Exp> nt_ExpList() :
+{
+  Exp ex;
+  List<Exp> exs = new LinkedList<Exp>();
+}
+{
+  (ex = nt_Exp() { exs.add(ex); }
+  (ex = nt_ExpRest() { exs.add(ex); })*)? { return exs; }
+}
+
+public Exp nt_ExpRest() :
+{
+  Exp ex;
+}
+{
+  <COMMA> ex = nt_Exp() { return ex; }
+}
+
+public void eof() :
+{}
+{
+  <EOF>
+}

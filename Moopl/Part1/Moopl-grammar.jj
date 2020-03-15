@@ -1,0 +1,249 @@
+options {
+  STATIC = false;
+}
+
+PARSER_BEGIN(MooplParser)
+  import syntaxtree.*;
+  import syntaxtree.interp.*;
+  import java.util.List;
+  import java.util.LinkedList;
+  public class MooplParser {
+  }
+PARSER_END(MooplParser)
+
+SKIP : /* Define white-space and comments here */
+{
+    " "
+  | "\t"
+  | "\n"
+  | "\r"
+  | "\f"
+  | < "//" (~["\n","\r"])* ("\n"|"\r"|"\r\n") >
+  | <"/*" (~["*"])* "*" ("*" | (~["*","/"] (~["*"])* "*"))* "/">
+}
+
+TOKEN : /* Define the Moopl tokens here. */
+{
+  < PROC: "proc" >
+| < FUN: "fun" >
+| < CLASS: "class" >
+| < EXTENDS: "extends" >
+| < OPENCBR: "{" >
+| < CLOSECBR: "}" >
+| < SEMICOLON: ";" >
+| < OPENBRAC: "(" >
+| < CLOSEBRAC: ")" >
+| < RETURN: "return" >
+| < COMMA: "," >
+| < ARRAYOF: "arrayof" >
+| < BOOL: "boolean" >
+| < INT: "int" >
+| < EQUALS: "=" >
+| < OPENSQBR: "[" >
+| < CLOSESQBR: "]" >
+| < IF: "if" >
+| < THEN: "then" >
+| < ELSE: "else" >
+| < WHILE: "while" >
+| < DO: "do" >
+| < OUTPUT: "output" >
+| < DOT: "." >
+| < LENGTH: "length" >
+| < TRUE: "true" >
+| < FALSE: "false" >
+| < SELF: "self" >
+| < NEW: "new" >
+| < OBJ: "object" >
+| < NOT: "!" >
+| < ISNULL: "isnull" >
+| < OP: "and" | "<" | "==" | "div" | "+" | "-" | "*" >
+| < INTEGER_LITERAL: (["0"-"9"])+ >
+| < ID: ["a"-"z","A"-"Z"](["a"-"z","A"-"Z","0"-"9","_"])* >
+}
+
+/*
+ * TOKEN tester
+ */
+public void testTokens() :
+{
+  Token t;
+}
+{
+  ( ( ( t = <PROC>
+      | t = <FUN>
+      | t = <CLASS>
+      | t = <EXTENDS>
+      | t = <OPENCBR>
+      | t = <CLOSECBR>
+      | t = <SEMICOLON>
+      | t = <OPENBRAC>
+      | t = <CLOSEBRAC>
+      | t = <RETURN>
+      | t = <COMMA>
+      | t = <ARRAYOF>
+      | t = <BOOL>
+      | t = <INT>
+      | t = <EQUALS>
+      | t = <OPENSQBR>
+      | t = <CLOSESQBR>
+      | t = <IF>
+      | t = <THEN>
+      | t = <ELSE>
+      | t = <WHILE>
+      | t = <DO>
+      | t = <OUTPUT>
+      | t = <DOT>
+      | t = <LENGTH>
+      | t = <TRUE>
+      | t = <FALSE>
+      | t = <SELF>
+      | t = <NEW>
+      | t = <OBJ>
+      | t = <NOT>
+      | t = <ISNULL>
+      )
+      { System.out.println("Recognised as valid token: " + t.image); }
+    )
+  | ( t = <INTEGER_LITERAL>
+      { System.out.println("Recognised as INTEGER_LITERAL: " + t.image); }
+    )
+  | ( t = <ID>
+      { System.out.println("Recognised as ID: " + t.image); }
+    )
+  | ( t = <OP> 
+      { System.out.println("Recognised as OP: " + t.image); }
+    )
+  )*
+}
+
+
+/************************************
+ * The Moopl grammar starts here *
+ ************************************/
+
+
+public void nt_Program() :
+{}
+{
+  (nt_ProcDecl())+ (nt_ClassDecl())*
+}
+
+public void nt_ClassDecl() :
+{}
+{ 
+  LOOKAHEAD(3) <CLASS> <ID> <OPENCBR> (nt_FieldDecl())* (nt_MethodDecl())* <CLOSECBR>
+  | <CLASS> <ID> <EXTENDS> <ID> <OPENCBR> (nt_FieldDecl())* (nt_MethodDecl())* <CLOSECBR>
+}
+
+public void nt_MethodDecl() :
+{}
+{
+    nt_ProcDecl() | nt_FunDecl()
+}
+
+public void nt_FunDecl() :
+{}
+{
+  <FUN> nt_Type() <ID> <OPENBRAC> nt_FormalList() <CLOSEBRAC> <OPENCBR> (nt_Statement())* <RETURN> nt_Exp() <SEMICOLON> <CLOSECBR>
+}
+
+public void nt_ProcDecl() :
+{}
+{
+  <PROC> <ID> <OPENBRAC> nt_FormalList() <CLOSEBRAC> <OPENCBR> (nt_Statement())* <CLOSECBR>
+}
+
+public void nt_PrimaryExp() :
+{}
+{
+  <INTEGER_LITERAL>
+  | <TRUE>
+  | <FALSE>
+  | nt_Var()
+  | <SELF>
+  | LOOKAHEAD(2) <NEW> <ARRAYOF> <OPENBRAC> nt_Type() <CLOSEBRAC> <OPENSQBR> nt_Exp() <CLOSESQBR>
+  | <NEW> <OBJ> <ID> <OPENBRAC> nt_ExpList() <CLOSEBRAC>
+  | <NOT> nt_PrimaryExp()
+  | <ISNULL> nt_PrimaryExp()
+  | <OPENBRAC> nt_Exp() <CLOSEBRAC>
+}
+
+public void nt_FieldDecl() :
+{}
+{
+  nt_Type() <ID> <SEMICOLON>
+}
+
+public void nt_Type() :
+{}
+{
+  <ARRAYOF> <OPENBRAC> nt_Type() <CLOSEBRAC>
+  | <BOOL>
+  | <INT>
+  | <ID>
+}
+
+public void nt_FormalList() :
+{}
+{
+  (nt_Type() <ID> (nt_FormalRest())*)?
+}
+
+public void nt_FormalRest() :
+{}
+{
+  <COMMA> nt_Type() <ID>
+}
+
+public void nt_Statement() :
+{}
+{
+  nt_Block()
+  | LOOKAHEAD(2) nt_Type() <ID> <SEMICOLON>
+  | LOOKAHEAD(2) nt_Var() <EQUALS> nt_Exp() <SEMICOLON>
+  | nt_PrimaryExp() (<OPENSQBR> nt_Exp() <CLOSESQBR> <EQUALS> nt_Exp() <SEMICOLON>
+                    |<DOT> <ID> <OPENBRAC> nt_ExpList() <CLOSEBRAC> <SEMICOLON>)
+  | <IF> <OPENBRAC> nt_Exp() <CLOSEBRAC> <THEN> nt_Block() <ELSE> nt_Block()
+  | <WHILE> <OPENBRAC> nt_Exp() <CLOSEBRAC> <DO> nt_Block()
+  | <OUTPUT> nt_Exp() <SEMICOLON>
+}
+
+public void nt_Block() :
+{}
+{
+  <OPENCBR> (nt_Statement())* <CLOSECBR>
+}
+
+public void nt_Exp() :
+{}
+{
+  nt_PrimaryExp()(<OP> nt_PrimaryExp()
+                 |<OPENSQBR> nt_Exp() <CLOSESQBR>
+                 |LOOKAHEAD(2) <DOT> <LENGTH>
+                 |<DOT> <ID> <OPENBRAC> nt_ExpList() <CLOSEBRAC>
+                 |{})
+}
+
+public void nt_Var() :
+{}
+{
+  <ID>
+}
+
+public void nt_ExpList() :
+{}
+{
+  (nt_Exp() (nt_ExpRest())*)?
+}
+
+public void nt_ExpRest() :
+{}
+{
+  <COMMA> nt_Exp()
+}
+
+public void eof() :
+{}
+{
+  <EOF>
+}
